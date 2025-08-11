@@ -1,10 +1,4 @@
-import {
-  openDB,
-  type DBSchema,
-  type IDBPDatabase,
-  type IDBPTransaction,
-  type StoreNames,
-} from "idb";
+import { openDB, type DBSchema } from "idb";
 
 export type Entry = {
   weight: number;
@@ -17,7 +11,7 @@ interface Schema extends DBSchema {
 
 export async function openDatabase() {
   return await openDB<Schema>("waight", 1, {
-    upgrade(database, oldVersion, newVersion, transaction, event) {
+    upgrade(database, _oldVersion, _newVersion, _transaction, _event) {
       const store = database.createObjectStore("entries");
       store.createIndex("timestamp", "timestamp");
     },

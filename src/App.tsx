@@ -1,5 +1,5 @@
-import { createResource, createSignal, For, Show } from "solid-js";
-import { openDatabase, type Entry } from "./data";
+import { createResource, For, Show } from "solid-js";
+import { openDatabase } from "./data";
 
 export default function App() {
   const [database] = createResource(openDatabase);
