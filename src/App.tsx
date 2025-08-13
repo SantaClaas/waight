@@ -1,4 +1,10 @@
-import { createResource, For, Show } from "solid-js";
+import {
+  createEffect,
+  createResource,
+  createSignal,
+  For,
+  Show,
+} from "solid-js";
 import { openDatabase } from "./data";
 
 export default function App() {
@@ -45,6 +51,42 @@ export default function App() {
     refetch();
   }
 
+  const [unit, setUnit] = createSignal<"kg" | "lb">("kg");
+  // function handleChange(even: Event & { currentTarget: HTMLInputElement }) {
+  //   const value = even.currentTarget.value;
+  //   if (value !== "kg" && value !== "lb") throw new Error("Expected kg or lb");
+
+  //   setUnit(value);
+  // }
+
+  function format(weight: number, unit: "kg" | "lb") {
+    if (unit === "kg") return weight;
+    // If 1lb = 0.45359237kg
+    // Then divide both sides by 45359237 to get 1/45359237lb and 0.00000001kg
+    // Multiply both sides by 100_000_000 to get 2.2046226218lbs = 1kg
+    // 1/45359237*100_000_000
+    return weight * 2.2046226218;
+  }
+
+  let weightInput: HTMLInputElement | undefined;
+  // const value = () => {
+  //   const currentUnit = unit();
+  //   if (!weightInput) return;
+
+  //   return format(weightInput.valueAsNumber, currentUnit);
+  // };
+
+  createEffect(() => {
+    // weightInput?.value
+    const currentUnit = unit();
+    if (!weightInput?.valueAsNumber) return;
+    console.debug("Updating weight input", weightInput);
+    weightInput.valueAsNumber =
+      currentUnit === "kg"
+        ? weightInput.valueAsNumber / 2.2046226218
+        : weightInput.valueAsNumber * 2.2046226218;
+  });
+
   return (
     <main class="grid grid-rows-[auto_1fr_auto] items-start max-w-xl mx-auto bg-gray-200 h-full p-4 text-emerald-950">
       <h1 class="text-2xl font-light mb-3">Waight</h1>
@@ -53,7 +95,15 @@ export default function App() {
           {(entry) => (
             <li class="grid grid-cols-subgrid col-span-4 gap-x-3 rounded-xl p-4 bg-gray-50 items-center">
               <p class="text-3xl grid col-span-2 grid-cols-subgrid gap-x-1">
-                <span class="text-end">{entry.weight}</span> <span>㎏</span>
+                <span class="text-end">
+                  {format(entry.weight, unit()).toLocaleString(undefined, {
+                    maximumFractionDigits: 2,
+                    style: unit() === "kg" ? "unit" : "currency",
+                    currency: unit() === "lb" ? "gbp" : undefined,
+                    unit: unit() === "kg" ? "kilogram" : undefined,
+                  })}
+                </span>
+                {/* <span>{unit() === "kg" ? "㎏" : "￡"}</span> */}
               </p>
               <time>
                 {entry.timestamp.toLocaleString(undefined, {
@@ -84,21 +134,56 @@ export default function App() {
         </For>
       </ol>
       <Show when={database.state === "ready"}>
-        <form class="grid grid-cols-[1fr_auto] gap-2" onSubmit={handleSubmit}>
-          <label for="weight" class="sr-only">
-            Weight
+        <form class="grid grid-cols-[1fr_auto_auto]" onSubmit={handleSubmit}>
+          <label for="weight" class="grid grid-cols-[auto_1fr] items-center">
+            <span class="sr-only col-start-1 col-end-2">Weight</span>
+            <input
+              type="number"
+              id="weight"
+              name="weight"
+              step="0.01"
+              placeholder="Enter weight"
+              required
+              ref={weightInput}
+              class="outline-none bg-gray-50 ps-3 py-2 rounded-s-full col-span-2 col-start-1 col-end-3 row-start-1"
+            />
           </label>
-          <input
-            type="number"
-            id="weight"
-            name="weight"
-            step="0.01"
-            placeholder="Enter weight"
-            class="outline-none bg-gray-50 px-3 py-2 rounded-full"
-          />
+          {/* <fieldset class="rounded-e-full bg-gray-50 text-xl pe-4 py-1 w-12 text-end">
+            <legend class="sr-only">Unit</legend>
+            <label for="kg" class="has-checked:touch-none group">
+              <input
+                type="radio"
+                name="unit"
+                value="kg"
+                id="kg"
+                checked
+                onChange={handleChange}
+                class="sr-only"
+              />
+              <span class="not-group-[:has(:checked)]:sr-only">㎏</span>
+            </label>
+            <label for="lb" class="has-checked:touch-none group">
+              <input
+                type="radio"
+                name="unit"
+                value="lb"
+                id="lb"
+                onChange={handleChange}
+                class="sr-only"
+              />
+              <span class="not-group-[:has(:checked)]:sr-only">￡</span>
+            </label>
+          </fieldset> */}
+          <button
+            type="button"
+            onClick={() => setUnit(unit() === "kg" ? "lb" : "kg")}
+            class="rounded-e-full bg-gray-50 text-xl pe-4 py-1 w-12 text-end"
+          >
+            {unit() === "kg" ? "㎏" : "￡"}
+          </button>
           <button
             type="submit"
-            class="rounded-full size-10 bg-emerald-500 content-center justify-items-center outline-none"
+            class="rounded-full size-10 bg-emerald-500 content-center justify-items-center outline-none ms-2"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
