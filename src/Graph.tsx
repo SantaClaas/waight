@@ -1,12 +1,24 @@
 import { For } from "solid-js";
 
+function* repeat(times: number) {
+  for (let i = 0; i < times; i++) {
+    yield i;
+  }
+}
+
 export default function Graph() {
   const maxX = 100;
   const maxY = 100;
 
+  const numberOfPoints = Math.floor(100 * Math.random());
+
   const sampleData = {
-    x: [1, 5, 12, 18, 25],
-    y: [80, 79.5, 79, 78, 77.5],
+    x: repeat(numberOfPoints)
+      .map(() => Math.random() * maxX)
+      .toArray(),
+    y: repeat(numberOfPoints)
+      .map(() => Math.random() * maxY)
+      .toArray(),
   };
 
   if (sampleData.x.length !== sampleData.y.length)
@@ -21,11 +33,9 @@ export default function Graph() {
 
   // Σx²
   const xSquaredSum = xSquared().reduce((sum, x) => sum + x, 0);
-  console.debug("xSquaredSum", xSquaredSum);
 
   // Σxy
   const xTimesYSum = xTimesY().reduce((sum, product) => sum + product, 0);
-  console.debug("xTimesYSum", xTimesYSum);
 
   const xSum = sampleData.x.reduce((sum, x) => sum + x, 0);
   const ySum = sampleData.y.reduce((sum, y) => sum + y, 0);
@@ -35,7 +45,6 @@ export default function Graph() {
   const dividend = n * xTimesYSum - xSum * ySum;
   const divisor = n * xSquaredSum - xSum * xSum;
   const slope = dividend / divisor;
-  console.debug("slope", slope);
 
   // Calculate y intercept b
   // b=yˉ​−mxˉ
@@ -48,8 +57,6 @@ export default function Graph() {
 
   // Calculate b
   const yIntercept = yAverage - slope * xAverage;
-
-  console.debug("yIntercept", yIntercept);
 
   return (
     <svg viewBox={`0 0 ${maxX} ${maxY}`}>
@@ -84,12 +91,12 @@ export default function Graph() {
         y1={maxY - yIntercept}
         y2={maxY - (slope * maxX + yIntercept)}
         stroke-linecap="round"
-        class="stroke-[0.5] stroke-gray-400"
+        class="stroke-[0.5] stroke-sky-400"
       />
       <For each={sampleData.x}>
         {(x, index) => {
           const y = sampleData.y[index()];
-          return <circle cx={x} cy={maxY - y} r="2" fill="red" />;
+          return <circle cx={x} cy={maxY - y} r="1" class="fill-emerald-500" />;
         }}
       </For>
     </svg>
