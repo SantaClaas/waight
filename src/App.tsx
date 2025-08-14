@@ -2,11 +2,14 @@ import {
   createEffect,
   createResource,
   createSignal,
+  ErrorBoundary,
   For,
   Show,
 } from "solid-js";
 import { openDatabase } from "./data";
 import Graph from "./Graph";
+
+type Unit = "kg" | "lb";
 
 export default function App() {
   const [database] = createResource(openDatabase);
@@ -52,15 +55,9 @@ export default function App() {
     refetch();
   }
 
-  const [unit, setUnit] = createSignal<"kg" | "lb">("kg");
-  // function handleChange(even: Event & { currentTarget: HTMLInputElement }) {
-  //   const value = even.currentTarget.value;
-  //   if (value !== "kg" && value !== "lb") throw new Error("Expected kg or lb");
+  const [unit, setUnit] = createSignal<Unit>("kg");
 
-  //   setUnit(value);
-  // }
-
-  function format(weight: number, unit: "kg" | "lb") {
+  function format(weight: number, unit: Unit) {
     if (unit === "kg") return weight;
     // If 1lb = 0.45359237kg
     // Then divide both sides by 45359237 to get 1/45359237lb and 0.00000001kg
@@ -70,18 +67,11 @@ export default function App() {
   }
 
   let weightInput: HTMLInputElement | undefined;
-  // const value = () => {
-  //   const currentUnit = unit();
-  //   if (!weightInput) return;
-
-  //   return format(weightInput.valueAsNumber, currentUnit);
-  // };
 
   createEffect(() => {
-    // weightInput?.value
+    // Need to access unit here to register it as a effect dependency
     const currentUnit = unit();
     if (!weightInput?.valueAsNumber) return;
-    console.debug("Updating weight input", weightInput);
     weightInput.valueAsNumber =
       currentUnit === "kg"
         ? weightInput.valueAsNumber / 2.2046226218
@@ -91,7 +81,21 @@ export default function App() {
   return (
     <main class="grid grid-rows-[auto_1fr_auto] items-start max-w-xl mx-auto bg-gray-200 h-full p-4 text-emerald-950">
       <h1 class="text-2xl font-light mb-3">Waight</h1>
-      <Graph />
+      <ErrorBoundary
+        fallback={(error, reset) => (
+          <article>
+            <h2>Error creating graph</h2>
+            <details>
+              <summary>Error</summary>
+              <pre>{error.message}</pre>
+              <pre>{error}</pre>
+            </details>
+            <button onClick={reset}>Try again</button>
+          </article>
+        )}
+      >
+        <Graph entries={() => entries() ?? []} />
+      </ErrorBoundary>
       <ol class="grid grid-cols-[auto_1fr_auto_auto] gap-y-2">
         <For each={entries()}>
           {(entry) => (
