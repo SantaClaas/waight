@@ -6,6 +6,7 @@ import {
   Show,
 } from "solid-js";
 import { openDatabase } from "./data";
+import Graph from "./Graph";
 
 export default function App() {
   const [database] = createResource(openDatabase);
@@ -90,6 +91,7 @@ export default function App() {
   return (
     <main class="grid grid-rows-[auto_1fr_auto] items-start max-w-xl mx-auto bg-gray-200 h-full p-4 text-emerald-950">
       <h1 class="text-2xl font-light mb-3">Waight</h1>
+      <Graph />
       <ol class="grid grid-cols-[auto_1fr_auto_auto] gap-y-2">
         <For each={entries()}>
           {(entry) => (
