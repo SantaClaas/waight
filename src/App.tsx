@@ -87,7 +87,7 @@ export default function App() {
             <h2>Error creating graph</h2>
             <details>
               <summary>Error</summary>
-              <pre>{error.message}</pre>
+              <pre class="whitespace-pre-wrap">{error.message}</pre>
               <pre>{error}</pre>
             </details>
             <button onClick={reset}>Try again</button>

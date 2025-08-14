@@ -1,4 +1,4 @@
-import { createEffect, For, from, type Accessor, type JSX } from "solid-js";
+import { createEffect, For, Show, type Accessor, type JSX } from "solid-js";
 import type { Entry } from "./data";
 
 function* repeat(times: number) {
@@ -43,13 +43,23 @@ type Aggregation = {
     x: number;
     y: number;
   };
-  ranges: {
+  ranges?: {
     x: Range;
     y: Range;
   };
 };
 
 function aggregate(entries: Entry[], xScope: Range): Aggregation {
+  if (entries.length === 0)
+    return {
+      sums: {
+        xSquared: 0,
+        xTimesY: 0,
+        x: 0,
+        y: 0,
+      },
+    };
+
   const sums = {
     xSquared: 0,
     xTimesY: 0,
@@ -59,17 +69,18 @@ function aggregate(entries: Entry[], xScope: Range): Aggregation {
 
   const ranges = {
     x: {
-      from: Number.NEGATIVE_INFINITY,
-      to: Number.POSITIVE_INFINITY,
+      from: 0,
+      to: 0,
     },
     y: {
-      from: Number.NEGATIVE_INFINITY,
-      to: Number.POSITIVE_INFINITY,
+      from: 0,
+      to: 0,
     },
   };
 
   for (const entry of entries) {
-    const x = entry.timestamp.getTime() - xScope.from;
+    const x = entry.timestamp.getTime() - xScope.from / 1_000_000;
+
     // If the timestamp is before the start of the month
     if (x < 0) continue;
 
@@ -86,12 +97,12 @@ function aggregate(entries: Entry[], xScope: Range): Aggregation {
 
   return { sums, ranges };
 }
-
+//TODO write tests for 1, 2, n inputs
 function useTrendLine(
   entries: Accessor<Entry[]>,
   xRange: Range
 ): {
-  trendLine: Accessor<TrendLine>;
+  trendLine: Accessor<TrendLine | undefined>;
   aggregation: Accessor<Aggregation>;
 } {
   const n = () => entries().length;
@@ -99,20 +110,32 @@ function useTrendLine(
 
   const slope = () => {
     const { sums } = aggregation();
-    const dividend = n() * sums.xTimesY - sums.x * sums.y;
-    const divisor = n() * sums.xSquared - sums.x * sums.x;
+    const currentN = n();
+    if (currentN === 0) return 0;
+
+    const dividend = currentN * sums.xTimesY - sums.x * sums.y;
+    if (dividend === 0) return 0;
+
+    const divisor = currentN * sums.xSquared - sums.x * sums.x;
+    if (divisor === 0) return Infinity;
+
     return dividend / divisor;
   };
 
   const xAverage = () => aggregation().sums.x / n();
   const yAverage = () => aggregation().sums.y / n();
 
-  const yIntercept = () => yAverage() - slope() * xAverage();
+  const yIntercept = () => {
+    console.debug("yIntercept", yAverage(), slope(), xAverage());
+    return yAverage() - slope() * xAverage();
+  };
 
   const y = (x: number) => slope() * x + yIntercept();
 
-  const trendLine = (): TrendLine => {
+  const trendLine = (): TrendLine | undefined => {
     const { ranges } = aggregation();
+    console.debug("trendLine RANGES", ranges, yIntercept());
+    if (ranges === undefined) return;
     return {
       x1: 0,
       x2: ranges.x.to,
@@ -138,53 +161,62 @@ export default function Graph({ entries }: Properties) {
     console.debug("trendLine", trendLine());
   });
 
-  const maxX = () => aggregation().ranges.x.to;
-  const maxY = () => aggregation().ranges.y.to;
   return (
-    <svg viewBox={`0 0 ${maxX()} ${maxY()}`}>
-      {/* Y markers */}
-      <For each={[10, 20, 30, 40, 50, 60, 70, 80, 90]}>
-        {(y) => (
-          <line
-            x1="0"
-            x2="2"
-            y1={y}
-            y2={y}
-            stroke-linecap="round"
-            class="stroke-[0.5] stroke-gray-400"
-          />
-        )}
-      </For>
-      {/* X markers */}
-      <For each={[10, 20, 30, 40, 50, 60, 70, 80, 90]}>
-        {(x) => (
-          <line
-            x1={x}
-            x2={x}
-            y1={maxY()}
-            y2={maxY() - 2}
-            class="stroke-[0.5] stroke-gray-400"
-          />
-        )}
-      </For>
-      <line
-        {...trendLine()}
-        stroke-linecap="round"
-        class="stroke-[0.5] stroke-sky-400"
-      />
-      <For each={entries()}>
-        {(entry) => {
-          return (
-            // TODO filter out values out of range
-            <circle
-              cx={entry.timestamp.getTime() - xRange.from}
-              cy={maxY() - entry.weight}
-              r="1"
-              class="fill-emerald-500"
-            />
-          );
-        }}
-      </For>
-    </svg>
+    <Show when={aggregation().ranges}>
+      {(ranges) => {
+        //TODO don't use max for sizing SVG as it makes lines super thin and invisible. Use relative sizes instead
+        const maxX = () => ranges().x.to;
+        const maxY = () => ranges().y.to;
+        return (
+          <svg viewBox={`0 0 ${maxX()} ${maxY()}`}>
+            {/* Y markers */}
+            <For each={[10, 20, 30, 40, 50, 60, 70, 80, 90]}>
+              {(y) => (
+                <line
+                  x1="0"
+                  x2="2"
+                  y1={y}
+                  y2={y}
+                  stroke-linecap="round"
+                  class="stroke-[0.5] stroke-gray-400"
+                />
+              )}
+            </For>
+            {/* X markers */}
+            <For each={[10, 20, 30, 40, 50, 60, 70, 80, 90]}>
+              {(x) => (
+                <line
+                  x1={x}
+                  x2={x}
+                  y1={maxY()}
+                  y2={maxY() - 2}
+                  class="stroke-[0.5] stroke-gray-400"
+                />
+              )}
+            </For>
+            <Show when={trendLine()}>
+              <line
+                {...trendLine()}
+                stroke-linecap="round"
+                class="stroke-[0.5] stroke-sky-400"
+              />
+            </Show>
+            <For each={entries()}>
+              {(entry) => {
+                return (
+                  // TODO filter out values out of range
+                  <circle
+                    cx={entry.timestamp.getTime() - xRange.from}
+                    cy={maxY() - entry.weight}
+                    r="1"
+                    class="fill-emerald-500"
+                  />
+                );
+              }}
+            </For>
+          </svg>
+        );
+      }}
+    </Show>
   );
 }
