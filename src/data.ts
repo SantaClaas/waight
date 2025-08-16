@@ -1,4 +1,4 @@
-import { openDB, type DBSchema } from "idb";
+import { openDB, type DBSchema, type IDBPDatabase } from "idb";
 
 export type Entry = {
   weight: number;
@@ -8,6 +8,8 @@ export type Entry = {
 interface Schema extends DBSchema {
   entries: { key: number; value: Entry; indexes: { timestamp: Date } };
 }
+
+export type Database = IDBPDatabase<Schema>;
 
 export async function openDatabase() {
   return await openDB<Schema>("waight", 1, {
