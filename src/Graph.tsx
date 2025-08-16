@@ -36,6 +36,11 @@ type Range = {
   to: number;
 };
 
+type Ranges = {
+  x: Range;
+  y: Range;
+};
+
 type Aggregation = {
   sums: {
     xSquared: number;
@@ -43,13 +48,10 @@ type Aggregation = {
     x: number;
     y: number;
   };
-  ranges?: {
-    x: Range;
-    y: Range;
-  };
+  ranges?: Ranges;
 };
 
-function aggregate(entries: Entry[], xScope: Range): Aggregation {
+function aggregate(entries: Entry[]): Aggregation {
   if (entries.length === 0)
     return {
       sums: {
@@ -79,7 +81,10 @@ function aggregate(entries: Entry[], xScope: Range): Aggregation {
   };
 
   for (const entry of entries) {
-    const x = entry.timestamp.getTime() - xScope.from / 1_000_000;
+    // const timeInRange = entry.timestamp.getTime() - xScope.from;
+    // // x in minutes
+    // const x = timeInRange / 1_000 / 60;
+    const x = entry.timestamp.getTime();
 
     // If the timestamp is before the start of the month
     if (x < 0) continue;
@@ -98,15 +103,12 @@ function aggregate(entries: Entry[], xScope: Range): Aggregation {
   return { sums, ranges };
 }
 //TODO write tests for 1, 2, n inputs
-function useTrendLine(
-  entries: Accessor<Entry[]>,
-  xRange: Range
-): {
+function useTrendLine(entries: Accessor<Entry[]>): {
   trendLine: Accessor<TrendLine | undefined>;
   aggregation: Accessor<Aggregation>;
 } {
   const n = () => entries().length;
-  const aggregation = () => aggregate(entries(), xRange);
+  const aggregation = () => aggregate(entries());
 
   const slope = () => {
     const { sums } = aggregation();
@@ -125,26 +127,93 @@ function useTrendLine(
   const xAverage = () => aggregation().sums.x / n();
   const yAverage = () => aggregation().sums.y / n();
 
-  const yIntercept = () => {
-    console.debug("yIntercept", yAverage(), slope(), xAverage());
-    return yAverage() - slope() * xAverage();
-  };
+  const yIntercept = () => yAverage() - slope() * xAverage();
 
   const y = (x: number) => slope() * x + yIntercept();
 
   const trendLine = (): TrendLine | undefined => {
     const { ranges } = aggregation();
-    console.debug("trendLine RANGES", ranges, yIntercept());
     if (ranges === undefined) return;
     return {
       x1: 0,
       x2: ranges.x.to,
-      y1: ranges.y.to - yIntercept(),
-      y2: ranges.y.to - y(ranges.x.to),
+      y1: yIntercept(),
+      y2: y(ranges.x.to),
     };
   };
 
   return { trendLine, aggregation };
+}
+
+type Point = {
+  x: number;
+  y: number;
+};
+
+function XAxisMarks({ height }: { height: number }) {
+  return (
+    <For each={[10, 20, 30, 40, 50, 60, 70, 80, 90]}>
+      {(x) => (
+        <line
+          x1={x}
+          x2={x}
+          y1={height}
+          y2={height - 2}
+          class="stroke-[0.5] stroke-gray-400"
+        />
+      )}
+    </For>
+  );
+}
+
+function YAxisMarks({ width }: { width: number }) {
+  return (
+    <For each={[10, 20, 30, 40, 50, 60, 70, 80, 90]}>
+      {(y) => (
+        <line
+          x1="0"
+          x2="2"
+          y1={y}
+          y2={y}
+          stroke-linecap="round"
+          class="stroke-[0.5] stroke-gray-400"
+        />
+      )}
+    </For>
+  );
+}
+
+// const adjustToSvgSpace = () => {
+//   const { x, y } = ranges();
+//   const maxX = x.to;
+//   const maxY = y.to;
+
+//   return (x: number, y: number) => {
+//     // Percent of the max value
+//     // Percent of the width
+//     x = (x / maxX) * width;
+//     y = (y / maxY) * height;
+
+//     return [height - y, width - x];
+//   };
+// };
+
+function adjustToSvgSpace(
+  x: number,
+  y: number,
+  maxX: number,
+  maxY: number,
+  width: number,
+  height: number
+) {
+  // Percent of the max value
+  // Percent of the width
+  x = (x / maxX) * width;
+  y = (y / maxY) * height;
+
+  console.debug({ x, y, maxX, maxY, width, height });
+
+  return [height - y, width - x];
 }
 
 export default function Graph({ entries }: Properties) {
@@ -155,65 +224,59 @@ export default function Graph({ entries }: Properties) {
     from: startOfMonth(now.getFullYear(), now.getMonth()).getTime(),
     to: Number.POSITIVE_INFINITY,
   };
-  const { trendLine, aggregation } = useTrendLine(entries, xRange);
+  const { trendLine, aggregation } = useTrendLine(entries);
 
-  createEffect(() => {
-    console.debug("trendLine", trendLine());
-  });
+  const width = 100;
+  const height = 100;
+
+  createEffect(() => console.debug("trendLine", trendLine()));
 
   return (
     <Show when={aggregation().ranges}>
       {(ranges) => {
-        //TODO don't use max for sizing SVG as it makes lines super thin and invisible. Use relative sizes instead
-        const maxX = () => ranges().x.to;
-        const maxY = () => ranges().y.to;
+        const adjust = (x: number, y: number) => {
+          const { x: xRange } = ranges();
+          const relativeX = (x / xRange.to) * 100;
+
+          return adjustToSvgSpace(relativeX, y, 100, 100, width, height);
+        };
         return (
-          <svg viewBox={`0 0 ${maxX()} ${maxY()}`}>
-            {/* Y markers */}
-            <For each={[10, 20, 30, 40, 50, 60, 70, 80, 90]}>
-              {(y) => (
-                <line
-                  x1="0"
-                  x2="2"
-                  y1={y}
-                  y2={y}
-                  stroke-linecap="round"
-                  class="stroke-[0.5] stroke-gray-400"
-                />
-              )}
-            </For>
-            {/* X markers */}
-            <For each={[10, 20, 30, 40, 50, 60, 70, 80, 90]}>
-              {(x) => (
-                <line
-                  x1={x}
-                  x2={x}
-                  y1={maxY()}
-                  y2={maxY() - 2}
-                  class="stroke-[0.5] stroke-gray-400"
-                />
-              )}
-            </For>
+          <svg viewBox={`0 0 ${width} ${height}`}>
+            <YAxisMarks width={width} />
+            <XAxisMarks height={height} />
             <Show when={trendLine()}>
-              <line
-                {...trendLine()}
-                stroke-linecap="round"
-                class="stroke-[0.5] stroke-sky-400"
-              />
+              {(trendLine) => {
+                const line = trendLine();
+                const [x1, y1] = adjust(line.x1 as number, line.x2 as number);
+                const [x2, y2] = adjust(line.x2 as number, line.x2 as number);
+                return (
+                  <line
+                    x1={x1}
+                    x2={x2}
+                    y1={y1}
+                    y2={y2}
+                    stroke-linecap="round"
+                    class="stroke-[0.5] stroke-sky-400"
+                  />
+                );
+              }}
             </Show>
             <For each={entries()}>
-              {(entry) => {
+              {({ weight, timestamp }) => {
+                const [x, y] = adjust(timestamp.getTime(), weight);
                 return (
                   // TODO filter out values out of range
                   <circle
-                    cx={entry.timestamp.getTime() - xRange.from}
-                    cy={maxY() - entry.weight}
+                    cx={x}
+                    cy={y}
                     r="1"
+                    data-weight={weight}
                     class="fill-emerald-500"
                   />
                 );
               }}
             </For>
+            <circle cx="50" cy="50" r="1" class="fill-emerald-500" />
           </svg>
         );
       }}
