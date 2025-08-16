@@ -286,7 +286,7 @@ export default function Graph({ entries }: Properties) {
   }
 
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} class="h-full">
+    <svg viewBox={`0 0 ${width} ${height}`} class="w-full">
       <YAxisMarks />
       <XAxisMarks
         height={height}

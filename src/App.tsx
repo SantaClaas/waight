@@ -79,7 +79,7 @@ export default function App() {
   });
 
   return (
-    <main class="grid grid-rows-[auto_repeat(3,minmax(0,1fr))] items-start max-w-xl mx-auto bg-gray-200 h-full p-4 text-emerald-950">
+    <main class="max-w-xl mx-auto bg-gray-200 h-full p-4 text-emerald-950">
       <h1 class="text-2xl font-light mb-3">Waight</h1>
       <ErrorBoundary
         fallback={(error, reset) => (
