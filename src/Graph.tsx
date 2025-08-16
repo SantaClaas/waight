@@ -210,7 +210,7 @@ export default function Graph({ entries }: Properties) {
   }
 
   return (
-    <svg viewBox={`0 0 ${width} ${height}`}>
+    <svg viewBox={`0 0 ${width} ${height}`} class="h-full">
       <YAxisMarks />
       <XAxisMarks height={height} />
       <Show when={trendLine()}>
