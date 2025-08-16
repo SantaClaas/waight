@@ -79,7 +79,7 @@ export default function App() {
   });
 
   return (
-    <main class="grid grid-rows-[auto_1fr_auto] items-start max-w-xl mx-auto bg-gray-200 h-full p-4 text-emerald-950">
+    <main class="grid grid-rows-[auto_repeat(3,minmax(0,1fr))] items-start max-w-xl mx-auto bg-gray-200 h-full p-4 text-emerald-950">
       <h1 class="text-2xl font-light mb-3">Waight</h1>
       <ErrorBoundary
         fallback={(error, reset) => (
@@ -140,7 +140,10 @@ export default function App() {
         </For>
       </ol>
       <Show when={database.state === "ready"}>
-        <form class="grid grid-cols-[1fr_auto_auto]" onSubmit={handleSubmit}>
+        <form
+          class="grid grid-cols-[1fr_auto_auto] self-end"
+          onSubmit={handleSubmit}
+        >
           <label for="weight" class="grid grid-cols-[auto_1fr] items-center">
             <span class="sr-only col-start-1 col-end-2">Weight</span>
             <input

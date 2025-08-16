@@ -11,9 +11,8 @@ function endOfMonth(date: Date) {
 
 type Properties = { entries: Accessor<Entry[]> };
 
-type TrendLine = Pick<
-  JSX.LineSVGAttributes<SVGLineElement>,
-  "x1" | "x2" | "y1" | "y2"
+type TrendLine = Required<
+  Pick<JSX.LineSVGAttributes<SVGLineElement>, "x1" | "x2" | "y1" | "y2">
 >;
 
 type Range = {
@@ -87,10 +86,16 @@ function aggregate(entries: Entry[]): Aggregation {
 
   return { sums, ranges };
 }
+
 //TODO write tests for 1, 2, n inputs
-function useTrendLine(entries: Accessor<Entry[]>): {
+/**
+ * @param xRange - The range of the x axis that is visible in the graph
+ */
+function useTrendLine(
+  entries: Accessor<Entry[]>,
+  xRange: Range
+): {
   trendLine: Accessor<TrendLine | undefined>;
-  aggregation: Accessor<Aggregation>;
 } {
   const n = () => entries().length;
   const aggregation = () => aggregate(entries());
@@ -121,13 +126,13 @@ function useTrendLine(entries: Accessor<Entry[]>): {
     if (ranges === undefined) return;
     return {
       x1: 0,
-      x2: ranges.x.to,
       y1: yIntercept(),
-      y2: y(ranges.x.to),
+      x2: xRange.to,
+      y2: y(xRange.to),
     };
   };
 
-  return { trendLine, aggregation };
+  return { trendLine };
 }
 
 function XAxisMarks({ height }: { height: number }) {
@@ -174,24 +179,35 @@ export default function Graph({ entries }: Properties) {
   // const weightStart = 0;
   const weightEnd = 100;
 
-  const { trendLine } = useTrendLine(entries);
+  const { trendLine } = useTrendLine(entries, { from: timeStart, to: timeEnd });
 
   const width = 100;
   const height = 100;
-  const adjustX = (x: number) => {
+  function projectX(x: number) {
     const timeRange = timeEnd - timeStart;
     const xInTimeRange = x - timeStart;
     const percentage = xInTimeRange / timeRange;
 
     const inSvg = percentage * width;
     return inSvg;
-  };
+  }
 
-  const adjustY = (y: number) => {
+  function projectY(y: number) {
     const percentage = y / weightEnd;
     const inSvg = height - percentage * height;
     return inSvg;
-  };
+  }
+
+  function projectTrendline(trendLine: TrendLine) {
+    const { x1, x2, y1, y2 } = trendLine;
+    return {
+      // Assume when it is a string is is the correct percentage string
+      x1: typeof x1 === "number" ? projectX(x1) : x1,
+      x2: typeof x2 === "number" ? projectX(x2) : x2,
+      y1: typeof y1 === "number" ? projectY(y1) : y1,
+      y2: typeof y2 === "number" ? projectY(y2) : y2,
+    };
+  }
 
   return (
     <svg viewBox={`0 0 ${width} ${height}`}>
@@ -199,13 +215,10 @@ export default function Graph({ entries }: Properties) {
       <XAxisMarks height={height} />
       <Show when={trendLine()}>
         {(trendLine) => {
-          const { x1, x2, y1, y2 } = trendLine();
+          const projectedTrendLine = projectTrendline(trendLine());
           return (
             <line
-              x1={adjustX(x1 as number)}
-              x2={adjustX(x2 as number)}
-              y1={adjustY(y1 as number)}
-              y2={adjustY(y2 as number)}
+              {...projectedTrendLine}
               stroke-linecap="round"
               class="stroke-[0.5] stroke-sky-400"
             />
@@ -217,8 +230,8 @@ export default function Graph({ entries }: Properties) {
           return (
             // TODO filter out values out of range
             <circle
-              cx={adjustX(timestamp.getTime())}
-              cy={adjustY(weight)}
+              cx={projectX(timestamp.getTime())}
+              cy={projectY(weight)}
               r="1"
               data-weight={weight}
               class="fill-emerald-500"
