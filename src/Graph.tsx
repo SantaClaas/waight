@@ -118,17 +118,30 @@ function useTrendLine(
   const xAverage = () => aggregation().sums.x / n();
   const yAverage = () => aggregation().sums.y / n();
 
-  const yIntercept = () => yAverage() - slope() * xAverage();
+  const yIntercept = () => {
+    console.debug(
+      "yIntercept",
+      yAverage(),
+      "+",
+      slope(),
+      "*",
+      xAverage(),
+      "=",
+      yAverage() - slope() * xAverage()
+    );
+    return yAverage() - slope() * xAverage();
+  };
 
   const y = (x: number) => slope() * x + yIntercept();
 
   const trendLine = (): TrendLine | undefined => {
     const { ranges } = aggregation();
     if (ranges === undefined) return;
+    console.debug("trendLine", { y1: yIntercept() });
     return {
       x1: 0,
-      y1: yIntercept(),
       x2: xRange.to,
+      y1: yIntercept(),
       y2: y(xRange.to),
     };
   };
@@ -177,8 +190,17 @@ export default function Graph({ entries }: Properties) {
   const timeStart = startOfMonth(now).getTime();
   const timeEnd = endOfMonth(now).getTime();
 
+  const entriesInTimeRange = () => {
+    return entries().map(
+      ({ weight, timestamp }): Entry => ({
+        weight,
+        timestamp: new Date(timestamp.getTime() - timeStart),
+      })
+    );
+  };
+
   // const weightStart = 0;
-  const weightEnd = 100;
+  // const weightEnd = 100;
 
   const { trendLine, aggregation } = useTrendLine(entries, {
     from: timeStart,
@@ -187,6 +209,21 @@ export default function Graph({ entries }: Properties) {
 
   const width = 100;
   const height = 100;
+
+  const yRange = () => {
+    const { ranges } = aggregation();
+    //TODO make this unreachable
+    if (ranges === undefined) throw new Error("Expected ranges to be defined");
+    // const median = (ranges.y.from + ranges.y.to) / 2;
+
+    // const from = Math.min(median - 10, ranges.y.from - 5);
+    // const to = Math.max(median + 10, ranges.y.to + 5);
+    const from = ranges.y.from - 5;
+    const to = ranges.y.to + 5;
+
+    return { from, to, length: to - from };
+  };
+
   function projectX(x: number) {
     const timeRange = timeEnd - timeStart;
     const xInTimeRange = x - timeStart;
@@ -197,13 +234,16 @@ export default function Graph({ entries }: Properties) {
   }
 
   function projectY(y: number) {
-    const percentage = y / weightEnd;
+    const { from, to } = yRange();
+    const length = to - from;
+    const percentage = (y - from) / length;
     const inSvg = height - percentage * height;
     return inSvg;
   }
 
   function projectTrendline(trendLine: TrendLine) {
     const { x1, x2, y1, y2 } = trendLine;
+    console.debug("projectTrendline", x1, x2, y1, y2);
     return {
       // Assume when it is a string is is the correct percentage string
       x1: typeof x1 === "number" ? projectX(x1) : x1,
@@ -212,13 +252,6 @@ export default function Graph({ entries }: Properties) {
       y2: typeof y2 === "number" ? projectY(y2) : y2,
     };
   }
-
-  const yRange = () => {
-    const { ranges } = aggregation();
-    //TODO make this unreachable
-    if (ranges === undefined) throw new Error("Expected ranges to be defined");
-    const median = (ranges.y.from + ranges.y.to) / 2;
-  };
 
   return (
     <svg viewBox={`0 0 ${width} ${height}`} class="h-full">
