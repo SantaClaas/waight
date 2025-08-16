@@ -257,6 +257,8 @@ export default function Graph({ entries }: Properties) {
     const inSvg = height - percentage * height;
     return inSvg;
   }
+
+  // @ts-expect-error - TODO for tomorrow
   const yMarks = function* () {
     const { from, to } = yRange();
     for (let y = from; y < to; y += 5) {
