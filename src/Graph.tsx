@@ -149,18 +149,34 @@ function useTrendLine(
   return { trendLine, aggregation };
 }
 
-function XAxisMarks({ height }: { height: number }) {
+function XAxisMarks({
+  height,
+  xMarks,
+  projectX,
+}: {
+  height: number;
+  xMarks: Date[];
+  projectX: (x: number) => number;
+}) {
   return (
-    <For each={[10, 20, 30, 40, 50, 60, 70, 80, 90]}>
-      {(x) => (
-        <line
-          x1={x}
-          x2={x}
-          y1={height}
-          y2={height - 2}
-          class="stroke-[0.5] stroke-gray-400"
-        />
-      )}
+    <For each={xMarks}>
+      {(date) => {
+        const x = projectX(date.getTime());
+        return (
+          <>
+            <text x={x} y={height - 5} font-size="5px" text-anchor="middle">
+              {date.getDate()}
+            </text>
+            <line
+              x1={x}
+              x2={x}
+              y1={height}
+              y2={height - 2}
+              class="stroke-[0.5] stroke-gray-400"
+            />
+          </>
+        );
+      }}
     </For>
   );
 }
@@ -214,12 +230,13 @@ export default function Graph({ entries }: Properties) {
     const { ranges } = aggregation();
     //TODO make this unreachable
     if (ranges === undefined) throw new Error("Expected ranges to be defined");
-    // const median = (ranges.y.from + ranges.y.to) / 2;
 
+    // const median = (ranges.y.from + ranges.y.to) / 2;
     // const from = Math.min(median - 10, ranges.y.from - 5);
     // const to = Math.max(median + 10, ranges.y.to + 5);
-    const from = ranges.y.from - 5;
-    const to = ranges.y.to + 5;
+    const padding = 2.5;
+    const from = ranges.y.from - padding;
+    const to = ranges.y.to + padding;
 
     return { from, to, length: to - from };
   };
@@ -240,10 +257,23 @@ export default function Graph({ entries }: Properties) {
     const inSvg = height - percentage * height;
     return inSvg;
   }
+  const yMarks = function* () {
+    const { from, to } = yRange();
+    for (let y = from; y < to; y += 5) {
+      yield y;
+    }
+    yield to;
+  };
+
+  const xMarks = function* () {
+    for (let x = timeStart; x < timeEnd; x += 1000 * 60 * 60 * 24 * 5) {
+      yield new Date(x);
+    }
+    yield new Date(timeEnd);
+  };
 
   function projectTrendline(trendLine: TrendLine) {
     const { x1, x2, y1, y2 } = trendLine;
-    console.debug("projectTrendline", x1, x2, y1, y2);
     return {
       // Assume when it is a string is is the correct percentage string
       x1: typeof x1 === "number" ? projectX(x1) : x1,
@@ -256,7 +286,11 @@ export default function Graph({ entries }: Properties) {
   return (
     <svg viewBox={`0 0 ${width} ${height}`} class="h-full">
       <YAxisMarks />
-      <XAxisMarks height={height} />
+      <XAxisMarks
+        height={height}
+        xMarks={xMarks().toArray()}
+        projectX={projectX}
+      />
       <Show when={trendLine()}>
         {(trendLine) => {
           const projectedTrendLine = projectTrendline(trendLine());
