@@ -55,11 +55,11 @@ function aggregate(entries: Entry[]): Aggregation {
 
   const ranges = {
     x: {
-      from: 0,
+      from: Infinity,
       to: 0,
     },
     y: {
-      from: 0,
+      from: Infinity,
       to: 0,
     },
   };
