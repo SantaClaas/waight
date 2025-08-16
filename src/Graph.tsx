@@ -96,6 +96,7 @@ function useTrendLine(
   xRange: Range
 ): {
   trendLine: Accessor<TrendLine | undefined>;
+  aggregation: Accessor<Aggregation>;
 } {
   const n = () => entries().length;
   const aggregation = () => aggregate(entries());
@@ -132,7 +133,7 @@ function useTrendLine(
     };
   };
 
-  return { trendLine };
+  return { trendLine, aggregation };
 }
 
 function XAxisMarks({ height }: { height: number }) {
@@ -179,7 +180,10 @@ export default function Graph({ entries }: Properties) {
   // const weightStart = 0;
   const weightEnd = 100;
 
-  const { trendLine } = useTrendLine(entries, { from: timeStart, to: timeEnd });
+  const { trendLine, aggregation } = useTrendLine(entries, {
+    from: timeStart,
+    to: timeEnd,
+  });
 
   const width = 100;
   const height = 100;
@@ -208,6 +212,13 @@ export default function Graph({ entries }: Properties) {
       y2: typeof y2 === "number" ? projectY(y2) : y2,
     };
   }
+
+  const yRange = () => {
+    const { ranges } = aggregation();
+    //TODO make this unreachable
+    if (ranges === undefined) throw new Error("Expected ranges to be defined");
+    const median = (ranges.y.from + ranges.y.to) / 2;
+  };
 
   return (
     <svg viewBox={`0 0 ${width} ${height}`} class="h-full">
