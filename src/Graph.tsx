@@ -190,14 +190,14 @@ export default function Graph({ entries }: Properties) {
   const timeStart = startOfMonth(now).getTime();
   const timeEnd = endOfMonth(now).getTime();
 
-  const entriesInTimeRange = () => {
-    return entries().map(
-      ({ weight, timestamp }): Entry => ({
-        weight,
-        timestamp: new Date(timestamp.getTime() - timeStart),
-      })
-    );
-  };
+  // const entriesInTimeRange = () => {
+  //   return entries().map(
+  //     ({ weight, timestamp }): Entry => ({
+  //       weight,
+  //       timestamp: new Date(timestamp.getTime() - timeStart),
+  //     })
+  //   );
+  // };
 
   // const weightStart = 0;
   // const weightEnd = 100;
