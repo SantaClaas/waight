@@ -30,6 +30,10 @@ async function loadDebugData(database: Database) {
       weight: 83.9,
       timestamp: new Date("2025-08-16T10:20:00.000+02:00"),
     },
+    {
+      weight: 84.1,
+      timestamp: new Date("2025-08-17T10:28:00.000+02:00"),
+    },
   ];
 
   const adds = debugEntries.map((entry) =>
