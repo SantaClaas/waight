@@ -198,6 +198,9 @@ function YAxisMarks() {
   );
 }
 
+function daysInMilliseconds(days: number) {
+  return 1000 * 60 * 60 * 24 * days;
+}
 export default function Graph({ entries }: Properties) {
   //TODO make range configurable
   // Need to curb time stamp or we get overflow
@@ -268,7 +271,16 @@ export default function Graph({ entries }: Properties) {
   };
 
   const xMarks = function* () {
-    for (let x = timeStart; x < timeEnd; x += 1000 * 60 * 60 * 24 * 5) {
+    // 1st
+    const start = new Date(timeStart);
+    yield start;
+    // 5th
+    const fifth = timeStart + daysInMilliseconds(4);
+    yield new Date(fifth);
+    // 10th until end of month
+    const tenth = fifth + daysInMilliseconds(5);
+    const step = daysInMilliseconds(5);
+    for (let x = tenth; x < timeEnd - step; x += step) {
       yield new Date(x);
     }
     yield new Date(timeEnd);
@@ -286,7 +298,7 @@ export default function Graph({ entries }: Properties) {
   }
 
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} class="w-full">
+    <svg viewBox={`0 0 ${width} ${height}`} overflow="visible" class="w-full">
       <YAxisMarks />
       <XAxisMarks
         height={height}
