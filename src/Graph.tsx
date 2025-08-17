@@ -35,8 +35,9 @@ type Aggregation = {
   ranges?: Ranges;
 };
 
-function aggregate(entries: Entry[]): Aggregation {
-  if (entries.length === 0)
+type Point = { x: number; y: number };
+function aggregate(points: Point[]): Aggregation {
+  if (points.length === 0)
     return {
       sums: {
         xSquared: 0,
@@ -64,24 +65,19 @@ function aggregate(entries: Entry[]): Aggregation {
     },
   };
 
-  for (const entry of entries) {
-    // const timeInRange = entry.timestamp.getTime() - xScope.from;
-    // // x in minutes
-    // const x = timeInRange / 1_000 / 60;
-    const x = entry.timestamp.getTime();
-
+  for (const { x, y } of points) {
     // If the timestamp is before the start of the month
     if (x < 0) continue;
 
     sums.xSquared += x * x;
-    sums.xTimesY += x * entry.weight;
+    sums.xTimesY += x * y;
     sums.x += x;
-    sums.y += entry.weight;
+    sums.y += y;
 
     ranges.x.to = Math.max(ranges.x.to, x);
-    ranges.y.to = Math.max(ranges.y.to, entry.weight);
+    ranges.y.to = Math.max(ranges.y.to, y);
     ranges.x.from = Math.min(ranges.x.from, x);
-    ranges.y.from = Math.min(ranges.y.from, entry.weight);
+    ranges.y.from = Math.min(ranges.y.from, y);
   }
 
   return { sums, ranges };
@@ -92,7 +88,7 @@ function aggregate(entries: Entry[]): Aggregation {
  * @param xRange - The range of the x axis that is visible in the graph
  */
 function useTrendLine(
-  entries: Accessor<Entry[]>,
+  entries: Accessor<Point[]>,
   xRange: Range
 ): {
   trendLine: Accessor<TrendLine | undefined>;
@@ -221,7 +217,13 @@ export default function Graph({ entries }: Properties) {
   // const weightStart = 0;
   // const weightEnd = 100;
 
-  const { trendLine, aggregation } = useTrendLine(entries, {
+  const points = () =>
+    entries().map(({ weight, timestamp }) => ({
+      x: timestamp.getTime(),
+      y: weight,
+    }));
+
+  const { trendLine, aggregation } = useTrendLine(points, {
     from: timeStart,
     to: timeEnd,
   });
