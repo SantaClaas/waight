@@ -1,13 +1,12 @@
 import { For, Show, type Accessor, type JSX } from "solid-js";
 import type { Entry } from "./data";
-
-function startOfMonth(date: Date) {
-  return new Date(date.getFullYear(), date.getMonth(), 1);
-}
-
-function endOfMonth(date: Date) {
-  return new Date(date.getFullYear(), date.getMonth() + 1, 0);
-}
+import {
+  daysInMilliseconds,
+  daysInMonth,
+  endOfMonth,
+  startOfDay,
+  startOfMonth,
+} from "./date";
 
 type Properties = { entries: Accessor<Entry[]> };
 
@@ -66,9 +65,6 @@ function aggregate(points: Point[]): Aggregation {
   };
 
   for (const { x, y } of points) {
-    // If the timestamp is before the start of the month
-    if (x < 0) continue;
-
     sums.xSquared += x * x;
     sums.xTimesY += x * y;
     sums.x += x;
@@ -114,26 +110,14 @@ function useTrendLine(
   const xAverage = () => aggregation().sums.x / n();
   const yAverage = () => aggregation().sums.y / n();
 
-  const yIntercept = () => {
-    console.debug(
-      "yIntercept",
-      yAverage(),
-      "+",
-      slope(),
-      "*",
-      xAverage(),
-      "=",
-      yAverage() - slope() * xAverage()
-    );
-    return yAverage() - slope() * xAverage();
-  };
+  const yIntercept = () => yAverage() - slope() * xAverage();
 
   const y = (x: number) => slope() * x + yIntercept();
 
   const trendLine = (): TrendLine | undefined => {
     const { ranges } = aggregation();
     if (ranges === undefined) return;
-    console.debug("trendLine", { y1: yIntercept() });
+
     return {
       x1: 0,
       x2: xRange.to,
@@ -151,25 +135,26 @@ function XAxisMarks({
   projectX,
 }: {
   height: number;
-  xMarks: Date[];
+  xMarks: number[];
   projectX: (x: number) => number;
 }) {
   return (
     <For each={xMarks}>
-      {(date) => {
-        const x = projectX(date.getTime());
+      {(xMark) => {
+        const x = projectX(xMark);
         return (
           <>
-            <text x={x} y={height - 5} font-size="5px" text-anchor="middle">
-              {date.getDate()}
-            </text>
             <line
               x1={x}
               x2={x}
               y1={height}
               y2={height - 2}
+              data-x={xMark}
               class="stroke-[0.5] stroke-gray-400"
             />
+            <text x={x} y={height - 5} font-size="5px" text-anchor="middle">
+              {xMark}
+            </text>
           </>
         );
       }}
@@ -177,169 +162,191 @@ function XAxisMarks({
   );
 }
 
-function YAxisMarks() {
+function YAxisMarks({
+  yMarks,
+  projectY,
+}: {
+  yMarks: number[];
+  projectY: (y: number) => number;
+}) {
   return (
-    <For each={[10, 20, 30, 40, 50, 60, 70, 80, 90]}>
-      {(y) => (
-        <line
-          x1="0"
-          x2="2"
-          y1={y}
-          y2={y}
-          stroke-linecap="round"
-          class="stroke-[0.5] stroke-gray-400"
-        />
-      )}
+    <For each={yMarks}>
+      {(yMark) => {
+        const y = projectY(yMark);
+        return (
+          <>
+            <line
+              x1="0"
+              x2="2"
+              y1={y}
+              y2={y}
+              stroke-linecap="round"
+              class="stroke-[0.5] stroke-gray-400"
+            />
+
+            <text x={2} y={y} font-size="5px" alignment-baseline="middle">
+              {yMark}
+            </text>
+          </>
+        );
+      }}
     </For>
   );
 }
 
-function daysInMilliseconds(days: number) {
-  return 1000 * 60 * 60 * 24 * days;
-}
 export default function Graph({ entries }: Properties) {
-  //TODO make range configurable
   // Need to curb time stamp or we get overflow
   const now = new Date();
 
   const timeStart = startOfMonth(now).getTime();
   const timeEnd = endOfMonth(now).getTime();
+  function isInMonth({ timestamp }: Entry) {
+    return timeStart <= timestamp.getTime() && timestamp.getTime() < timeEnd;
+  }
 
-  // const entriesInTimeRange = () => {
-  //   return entries().map(
-  //     ({ weight, timestamp }): Entry => ({
-  //       weight,
-  //       timestamp: new Date(timestamp.getTime() - timeStart),
-  //     })
-  //   );
-  // };
-
-  // const weightStart = 0;
-  // const weightEnd = 100;
+  const days = daysInMonth(now);
 
   const points = () =>
-    entries().map(({ weight, timestamp }) => ({
-      x: timestamp.getTime(),
-      y: weight,
-    }));
+    entries()
+      .values()
+      .filter(isInMonth)
+      .map(({ weight, timestamp }) => {
+        const time = timestamp.getTime() - startOfDay(timestamp).getTime();
+        const dayCompletion = time / daysInMilliseconds(1);
+        // It is easier to work with full days instead of milliseconds
+        const day = timestamp.getDate() + dayCompletion;
+        return {
+          x: day,
+          y: weight,
+        };
+      })
+      .toArray();
 
   const { trendLine, aggregation } = useTrendLine(points, {
-    from: timeStart,
-    to: timeEnd,
+    from: 0,
+    to: days,
   });
 
   const width = 100;
   const height = 100;
 
-  const yRange = () => {
-    const { ranges } = aggregation();
-    //TODO make this unreachable
-    if (ranges === undefined) throw new Error("Expected ranges to be defined");
-
-    // const median = (ranges.y.from + ranges.y.to) / 2;
-    // const from = Math.min(median - 10, ranges.y.from - 5);
-    // const to = Math.max(median + 10, ranges.y.to + 5);
-    const padding = 2.5;
-    const from = ranges.y.from - padding;
-    const to = ranges.y.to + padding;
-
-    return { from, to, length: to - from };
-  };
-
   function projectX(x: number) {
-    const timeRange = timeEnd - timeStart;
-    const xInTimeRange = x - timeStart;
-    const percentage = xInTimeRange / timeRange;
+    const percentage = x / days;
 
     const inSvg = percentage * width;
     return inSvg;
   }
 
-  function projectY(y: number) {
-    const { from, to } = yRange();
-    const length = to - from;
-    const percentage = (y - from) / length;
-    const inSvg = height - percentage * height;
-    return inSvg;
-  }
-
-  // @ts-expect-error - TODO for tomorrow
-  const yMarks = function* () {
-    const { from, to } = yRange();
-    for (let y = from; y < to; y += 5) {
-      yield y;
-    }
-    yield to;
-  };
-
   const xMarks = function* () {
+    const step = 5;
     // 1st
-    const start = new Date(timeStart);
-    yield start;
+    yield 1;
     // 5th
-    const fifth = timeStart + daysInMilliseconds(4);
-    yield new Date(fifth);
+    yield step;
     // 10th until end of month
-    const tenth = fifth + daysInMilliseconds(5);
-    const step = daysInMilliseconds(5);
-    for (let x = tenth; x < timeEnd - step; x += step) {
-      yield new Date(x);
+    for (let x = step * 2; x < days - step; x += step) {
+      yield x;
     }
-    yield new Date(timeEnd);
-  };
 
-  function projectTrendline(trendLine: TrendLine) {
-    const { x1, x2, y1, y2 } = trendLine;
-    return {
-      // Assume when it is a string is is the correct percentage string
-      x1: typeof x1 === "number" ? projectX(x1) : x1,
-      x2: typeof x2 === "number" ? projectX(x2) : x2,
-      y1: typeof y1 === "number" ? projectY(y1) : y1,
-      y2: typeof y2 === "number" ? projectY(y2) : y2,
-    };
-  }
+    yield days;
+  };
 
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} overflow="visible" class="w-full">
-      <YAxisMarks />
-      <XAxisMarks
-        height={height}
-        xMarks={xMarks().toArray()}
-        projectX={projectX}
-      />
-      <Show when={trendLine()}>
-        {(trendLine) => {
-          const projectedTrendLine = projectTrendline(trendLine());
-          return (
-            <line
-              {...projectedTrendLine}
-              stroke-linecap="round"
-              class="stroke-[0.5] stroke-sky-400"
+    <Show when={aggregation().ranges}>
+      {(ranges) => {
+        const yRange = () => {
+          const { y } = ranges();
+          const padding = 3;
+          const median = (y.from + y.to) / 2;
+          let from = Math.min(median - 5, y.from - padding);
+          let to = Math.max(median + 5, y.to + padding);
+          // let from = y.from - padding;
+          // let to = y.to + padding;
+          const stepSize = to - from > 10 ? 5 : 2;
+          // Round to nearest step marker to make it look cleaner
+          from = Math.floor(from / stepSize) * stepSize;
+          to = Math.ceil(to / stepSize) * stepSize;
+
+          return { from, to, stepSize };
+        };
+
+        function projectY(y: number) {
+          const { from, to } = yRange();
+          const length = to - from;
+          const percentage = (y - from) / length;
+
+          const inSvg = height - percentage * height;
+          return inSvg;
+        }
+
+        const yMarks = function* () {
+          const { from, to, stepSize } = yRange();
+
+          for (let y = from + stepSize; y < to; y += stepSize) {
+            yield y;
+          }
+          yield to;
+        };
+
+        function projectTrendline(trendLine: TrendLine) {
+          const { x1, x2, y1, y2 } = trendLine;
+          return {
+            // Assume when it is a string is is the correct percentage string
+            x1: typeof x1 === "number" ? projectX(x1) : x1,
+            x2: typeof x2 === "number" ? projectX(x2) : x2,
+            y1: typeof y1 === "number" ? projectY(y1) : y1,
+            y2: typeof y2 === "number" ? projectY(y2) : y2,
+          };
+        }
+
+        return (
+          <svg
+            viewBox={`0 0 ${width} ${height}`}
+            overflow="visible"
+            class="w-full"
+          >
+            <YAxisMarks yMarks={yMarks().toArray()} projectY={projectY} />
+            <XAxisMarks
+              height={height}
+              xMarks={xMarks().toArray()}
+              projectX={projectX}
             />
-          );
-        }}
-      </Show>
-      <For each={entries()}>
-        {({ weight, timestamp }) => {
-          return (
-            // TODO filter out values out of range
-            <circle
-              cx={projectX(timestamp.getTime())}
-              cy={projectY(weight)}
-              r="1"
-              data-weight={weight}
-              class="fill-emerald-500"
+            <Show when={trendLine()}>
+              {(trendLine) => {
+                const projectedTrendLine = projectTrendline(trendLine());
+                return (
+                  <line
+                    {...projectedTrendLine}
+                    stroke-linecap="round"
+                    class="stroke-[0.5] stroke-sky-400"
+                  />
+                );
+              }}
+            </Show>
+            <For each={points()}>
+              {({ x, y }) => {
+                return (
+                  // TODO filter out values out of range
+                  <circle
+                    cx={projectX(x)}
+                    cy={projectY(y)}
+                    r="1"
+                    data-weight={y}
+                    class="fill-emerald-500"
+                  />
+                );
+              }}
+            </For>
+            <path
+              d={`M${width / 2 - 2.5},${height / 2} l5,0 M${width / 2},${
+                height / 2 - 2.5
+              } l0,5 `}
+              stroke-width={0.5}
+              class="stroke-gray-300"
             />
-          );
-        }}
-      </For>
-      <path
-        d={`M${width / 2 - 2.5},${height / 2} l5,0 M${width / 2},${
-          height / 2 - 2.5
-        } l0,5 `}
-        stroke-width={0.5}
-        class="stroke-gray-300"
-      />
-    </svg>
+          </svg>
+        );
+      }}
+    </Show>
   );
 }
