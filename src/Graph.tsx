@@ -136,7 +136,7 @@ function XAxisMarks({
 }: {
   height: number;
   xMarks: number[];
-  projectX: (x: number) => number;
+  projectX: Projector;
 }) {
   return (
     <For each={xMarks}>
@@ -152,7 +152,7 @@ function XAxisMarks({
               data-x={xMark}
               class="stroke-[0.5] stroke-gray-400"
             />
-            <text x={x} y={height - 5} font-size="5px" text-anchor="middle">
+            <text x={x} y={height - 5} text-anchor="middle">
               {xMark}
             </text>
           </>
@@ -167,7 +167,7 @@ function YAxisMarks({
   projectY,
 }: {
   yMarks: number[];
-  projectY: (y: number) => number;
+  projectY: Projector;
 }) {
   return (
     <For each={yMarks}>
@@ -184,13 +184,74 @@ function YAxisMarks({
               class="stroke-[0.5] stroke-gray-400"
             />
 
-            <text x={2} y={y} font-size="5px" alignment-baseline="middle">
+            <text x={2} y={y} alignment-baseline="middle">
               {yMark}
             </text>
           </>
         );
       }}
     </For>
+  );
+}
+
+type Projector = (value: number) => number;
+let rerenderCount = 0;
+
+function Path({
+  points,
+  projectX,
+  projectY,
+}: {
+  points: Point[];
+  projectX: Projector;
+  projectY: Projector;
+}) {
+  const projected = points
+    .values()
+    .map(({ x, y }) => ({
+      x: projectX(x),
+      y: projectY(y),
+    }))
+    .toArray();
+
+  let data = "";
+
+  /**
+   * A semicolon-separated list of entire path definitions (d="..."). This is where you define the key shapes:
+   */
+  const values = `M${projected
+    .map(({ x, y }) => `${x},100`)
+    .join(" L")}; M${projected.map(({ x, y }) => `${x},${y}`).join(" L")}`;
+  console.debug("values", values);
+  /**
+   * A list of time markers (0 to 1) corresponding to each shape in {@link values}. This controls the timing of the bounce.
+   * For example, `0; 0.8; 1` would spend 80% of the duration moving to the overshoot shape and 20% settling back.
+   */
+  const keyTimes = "0; 1";
+
+  /**
+   * "ease-out" easing function bezier curve points (x1, y1, x2, y2) in keySplines syntax.
+   * [MDN easing-function](https://developer.mozilla.org/en-US/docs/Web/CSS/easing-function#cubic-bezier-easing-function)
+   */
+  const EASE_OUT_KEY_SPLINES = "0.42 0 1 1";
+
+  return (
+    <path
+      d={`M${projected.map(({ x, y }) => `${x},${y}`).join(" L")}`}
+      class="stroke-emerald-300 fill-none stroke-[0.5]"
+    >
+      {rerenderCount++}
+      <animate
+        attributeName="d"
+        values={values}
+        dur="2s"
+        fill="freeze"
+        repeatCount={1}
+        calcMode="spline"
+        keySplines={EASE_OUT_KEY_SPLINES}
+        keyTimes={keyTimes}
+      />
+    </path>
   );
 }
 
@@ -323,6 +384,7 @@ export default function Graph({ entries }: Properties) {
                 );
               }}
             </Show>
+            <Path points={points()} projectX={projectX} projectY={projectY} />
             <For each={points()}>
               {({ x, y }) => {
                 return (
