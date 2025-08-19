@@ -195,7 +195,6 @@ function YAxisMarks({
 }
 
 type Projector = (value: number) => number;
-let rerenderCount = 0;
 
 function Path({
   points,
@@ -213,8 +212,6 @@ function Path({
       y: projectY(y),
     }))
     .toArray();
-
-  let data = "";
 
   /**
    * A semicolon-separated list of entire path definitions (d="..."). This is where you define the key shapes:
