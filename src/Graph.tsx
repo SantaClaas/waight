@@ -220,7 +220,7 @@ function Path({
    * A semicolon-separated list of entire path definitions (d="..."). This is where you define the key shapes:
    */
   const values = `M${projected
-    .map(({ x, y }) => `${x},100`)
+    .map(({ x }) => `${x},100`)
     .join(" L")}; M${projected.map(({ x, y }) => `${x},${y}`).join(" L")}`;
   console.debug("values", values);
   /**
@@ -240,7 +240,6 @@ function Path({
       d={`M${projected.map(({ x, y }) => `${x},${y}`).join(" L")}`}
       class="stroke-emerald-300 fill-none stroke-[0.5]"
     >
-      {rerenderCount++}
       <animate
         attributeName="d"
         values={values}
